@@ -1,0 +1,753 @@
+{
+  "tool": {
+    "name": "splitguard",
+    "version": "0.2.0"
+  },
+  "report_format_version": "1.0",
+  "mode": "train_test",
+  "inputs": [
+    {
+      "role": "train",
+      "name": "train.csv",
+      "source_type": "csv_file",
+      "size_bytes": 102480,
+      "sha256": "9174e85283e38b3cc1a0fecc3fa71c2f9d445478d116e46b1a30300d557dc176",
+      "n_rows": 800,
+      "n_columns": 11,
+      "columns": [
+        "x1",
+        "x2",
+        "region",
+        "income",
+        "churn",
+        "refund_amount",
+        "refund_amount_available_at",
+        "tenure_months",
+        "tenure_available_at",
+        "prediction_time",
+        "outcome_time"
+      ]
+    },
+    {
+      "role": "test",
+      "name": "test.csv",
+      "source_type": "csv_file",
+      "size_bytes": 25735,
+      "sha256": "753a401d2fd20b07bcef37b52f23fc9ab62d8bfaf91de369e1a429b9bb0e8984",
+      "n_rows": 200,
+      "n_columns": 11,
+      "columns": [
+        "x1",
+        "x2",
+        "region",
+        "income",
+        "churn",
+        "refund_amount",
+        "refund_amount_available_at",
+        "tenure_months",
+        "tenure_available_at",
+        "prediction_time",
+        "outcome_time"
+      ]
+    }
+  ],
+  "partitions": {
+    "train": {
+      "n_rows": 800,
+      "n_columns": 11
+    },
+    "test": {
+      "n_rows": 200,
+      "n_columns": 11
+    }
+  },
+  "configuration": {
+    "target": "churn",
+    "entity_id": null,
+    "prediction_timestamp": "prediction_time",
+    "outcome_timestamp": "outcome_time",
+    "feature_availability": {
+      "refund_amount": "refund_amount_available_at",
+      "tenure_months": "tenure_available_at"
+    },
+    "exclude_columns": [],
+    "scenario": "forecasting",
+    "task_type": "auto",
+    "min_lead_time": null,
+    "expect_target_in_test": true,
+    "test_target_diagnostics": false,
+    "thresholds": {
+      "numeric_rtol": 1e-06,
+      "numeric_atol": 1e-09,
+      "near_copy_match_rate": 0.98,
+      "near_copy_min_kappa": 0.9,
+      "strong_correlation": 0.9,
+      "strong_auc": 0.95,
+      "strong_cramers_v": 0.9,
+      "strong_eta": 0.9,
+      "min_rows_for_target_checks": 30,
+      "max_categories_for_association": 50,
+      "max_unique_ratio_for_categorical": 0.5,
+      "identifier_unique_ratio": 0.95,
+      "min_rows_for_identifier": 20,
+      "max_missing_rate_required": 0.5,
+      "cross_duplicate_critical_rate": 0.05,
+      "feature_row_low_uniqueness": 0.5,
+      "mostly_numeric_rate": 0.9
+    },
+    "limits": {
+      "max_file_bytes": 209715200,
+      "max_rows": 1000000,
+      "max_columns": 2000
+    }
+  },
+  "task_type": "classification",
+  "feature_columns": [
+    "x1",
+    "x2",
+    "region",
+    "income",
+    "refund_amount",
+    "tenure_months"
+  ],
+  "summary": {
+    "total_findings": 3,
+    "by_severity": {
+      "critical": 1,
+      "high": 1,
+      "medium": 1,
+      "low": 0,
+      "info": 0
+    },
+    "by_category": {
+      "duplicate_contamination": 0,
+      "target_leakage": 1,
+      "temporal_leakage": 2,
+      "identifier_risk": 0,
+      "schema_issue": 0,
+      "split_recommendation": 0
+    },
+    "checks_run": 25,
+    "checks_skipped": 1,
+    "checks_failed": 0
+  },
+  "checks": [
+    {
+      "check_id": "SCH-006",
+      "name": "Constant or empty columns",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "partition": "train",
+        "all_missing": [],
+        "constant": []
+      }
+    },
+    {
+      "check_id": "SCH-007",
+      "name": "Mostly numeric text column (mixed types)",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "columns": {}
+      }
+    },
+    {
+      "check_id": "SCH-008",
+      "name": "Target has fewer than two distinct values",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "n_distinct_target_values": 2
+      }
+    },
+    {
+      "check_id": "SCH-001",
+      "name": "Columns missing from test",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "missing_from_test": []
+      }
+    },
+    {
+      "check_id": "SCH-002",
+      "name": "Extra columns in test",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "extra_in_test": []
+      }
+    },
+    {
+      "check_id": "SCH-003",
+      "name": "Column type differs between train and test",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "mismatches": {}
+      }
+    },
+    {
+      "check_id": "SCH-004",
+      "name": "Target absent from test",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "expected": true,
+        "present": true,
+        "all_missing": false
+      }
+    },
+    {
+      "check_id": "SCH-005",
+      "name": "Test target classes unseen in train",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "n_train_classes": 2,
+        "n_test_classes": 2,
+        "n_unseen_classes": 0,
+        "n_test_rows_with_unseen_class": 0
+      }
+    },
+    {
+      "check_id": "ID-001",
+      "name": "High-uniqueness identifier-like column",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "n_candidates": 0
+      }
+    },
+    {
+      "check_id": "ID-002",
+      "name": "Likely row index column",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "n_row_index_columns": 0
+      }
+    },
+    {
+      "check_id": "ID-003",
+      "name": "Identifier values shared by train and test",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "columns_checked": [],
+        "row_index_columns_not_checked": [],
+        "configured_entity_id_checked_by": null
+      }
+    },
+    {
+      "check_id": "DUP-001",
+      "name": "Exact duplicate rows within a partition",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "train": {
+          "partition": "train",
+          "n_rows": 800,
+          "n_columns_compared": 11,
+          "n_duplicate_rows_beyond_first": 0,
+          "duplicate_rate": 0.0,
+          "n_rows_in_duplicate_groups": 0,
+          "n_duplicate_groups": 0,
+          "largest_group_size": 0
+        },
+        "test": {
+          "partition": "test",
+          "n_rows": 200,
+          "n_columns_compared": 11,
+          "n_duplicate_rows_beyond_first": 0,
+          "duplicate_rate": 0.0,
+          "n_rows_in_duplicate_groups": 0,
+          "n_duplicate_groups": 0,
+          "largest_group_size": 0
+        }
+      }
+    },
+    {
+      "check_id": "DUP-002",
+      "name": "Exact rows shared by train and test",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "n_columns_compared": 11,
+        "columns_not_compared": [],
+        "n_train_rows": 800,
+        "n_test_rows": 200,
+        "n_test_rows_also_in_train": 0,
+        "test_rate": 0.0,
+        "n_train_rows_also_in_test": 0,
+        "n_distinct_shared_rows": 0,
+        "train_row_uniqueness": 1.0
+      }
+    },
+    {
+      "check_id": "DUP-003",
+      "name": "Entity IDs shared by train and test",
+      "status": "skipped",
+      "reason": "No entity_id configured.",
+      "details": {}
+    },
+    {
+      "check_id": "DUP-004",
+      "name": "Identical feature rows shared by train and test",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "n_feature_columns_compared": 6,
+        "excluded_from_comparison": [
+          "churn",
+          "outcome_time",
+          "prediction_time",
+          "refund_amount_available_at",
+          "tenure_available_at"
+        ],
+        "n_test_rows_matching_train_features": 0,
+        "test_rate": 0.0,
+        "n_also_exact_full_row_matches": 0,
+        "n_feature_only_matches": 0,
+        "train_feature_row_uniqueness": 1.0
+      }
+    },
+    {
+      "check_id": "TGT-001",
+      "name": "Feature identical to the target",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "partition": "train",
+        "n_features_scanned": 6,
+        "features_with_too_few_pairs": [],
+        "features_with_constant_target_in_pairs": [],
+        "min_pairs": 30,
+        "n_flagged": 0
+      }
+    },
+    {
+      "check_id": "TGT-002",
+      "name": "Feature nearly identical to the target",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "partition": "train",
+        "n_features_scanned": 6,
+        "features_with_too_few_pairs": [],
+        "features_with_constant_target_in_pairs": [],
+        "min_pairs": 30,
+        "n_flagged": 0
+      }
+    },
+    {
+      "check_id": "TGT-003",
+      "name": "Feature is a deterministic re-encoding of the target",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "partition": "train",
+        "n_features_scanned": 6,
+        "features_with_too_few_pairs": [],
+        "features_with_constant_target_in_pairs": [],
+        "min_pairs": 30,
+        "n_flagged": 0
+      }
+    },
+    {
+      "check_id": "TGT-004",
+      "name": "Feature missingness determines the target",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "partition": "train",
+        "n_features_scanned": 6,
+        "features_with_too_few_pairs": [],
+        "features_with_constant_target_in_pairs": [],
+        "min_pairs": 30,
+        "n_flagged": 0
+      }
+    },
+    {
+      "check_id": "TGT-005",
+      "name": "Unusually strong univariate association with the target",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "partition": "train",
+        "n_features_evaluated": 6,
+        "strongest": [
+          {
+            "column": "refund_amount",
+            "statistic": "single-feature ROC AUC, max(auc, 1 - auc)",
+            "value": 1.0,
+            "threshold": 0.95,
+            "n_pairs": 800,
+            "flagged": true,
+            "auc": 1.0
+          },
+          {
+            "column": "x1",
+            "statistic": "single-feature ROC AUC, max(auc, 1 - auc)",
+            "value": 0.7154376438794915,
+            "threshold": 0.95,
+            "n_pairs": 800,
+            "flagged": false,
+            "auc": 0.7154376438794915
+          },
+          {
+            "column": "x2",
+            "statistic": "single-feature ROC AUC, max(auc, 1 - auc)",
+            "value": 0.6287533780402362,
+            "threshold": 0.95,
+            "n_pairs": 800,
+            "flagged": false,
+            "auc": 0.37124662195976377
+          },
+          {
+            "column": "income",
+            "statistic": "single-feature ROC AUC, max(auc, 1 - auc)",
+            "value": 0.5308152337103393,
+            "threshold": 0.95,
+            "n_pairs": 800,
+            "flagged": false,
+            "auc": 0.4691847662896607
+          },
+          {
+            "column": "tenure_months",
+            "statistic": "single-feature ROC AUC, max(auc, 1 - auc)",
+            "value": 0.5297423931538384,
+            "threshold": 0.95,
+            "n_pairs": 800,
+            "flagged": false,
+            "auc": 0.5297423931538384
+          },
+          {
+            "column": "region",
+            "statistic": "bias-corrected Cramer's V",
+            "value": 0.08816600488922816,
+            "threshold": 0.9,
+            "n_pairs": 800,
+            "flagged": false
+          }
+        ],
+        "skipped": {},
+        "note": "Associations are review signals, never proof of leakage."
+      }
+    },
+    {
+      "check_id": "TGT-006",
+      "name": "Target-like column name",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "n_columns_flagged": 0,
+        "skipped_already_flagged": []
+      }
+    },
+    {
+      "check_id": "TMP-001",
+      "name": "Feature available after prediction time",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "refund_amount": {
+          "availability_column": "refund_amount_available_at",
+          "boundary_rule": "Strict comparison: a value is flagged only if its timestamp is strictly later. Equal timestamps are counted in n_equal but not flagged, because the data cannot show whether a value stamped at exactly that instant was usable.",
+          "partitions": {
+            "train": {
+              "n_rows": 800,
+              "n_compared": 800,
+              "n_not_compared_missing": 0,
+              "n_violations": 800,
+              "violation_rate": 1.0,
+              "n_equal": 0,
+              "max_lag": "45 days 00:00:00",
+              "median_lag": "45 days 00:00:00"
+            },
+            "test": {
+              "n_rows": 200,
+              "n_compared": 200,
+              "n_not_compared_missing": 0,
+              "n_violations": 200,
+              "violation_rate": 1.0,
+              "n_equal": 0,
+              "max_lag": "45 days 00:00:00",
+              "median_lag": "45 days 00:00:00"
+            }
+          }
+        },
+        "tenure_months": {
+          "availability_column": "tenure_available_at",
+          "boundary_rule": "Strict comparison: a value is flagged only if its timestamp is strictly later. Equal timestamps are counted in n_equal but not flagged, because the data cannot show whether a value stamped at exactly that instant was usable.",
+          "partitions": {
+            "train": {
+              "n_rows": 800,
+              "n_compared": 800,
+              "n_not_compared_missing": 0,
+              "n_violations": 0,
+              "violation_rate": 0.0,
+              "n_equal": 0,
+              "max_lag": null,
+              "median_lag": null
+            },
+            "test": {
+              "n_rows": 200,
+              "n_compared": 200,
+              "n_not_compared_missing": 0,
+              "n_violations": 0,
+              "violation_rate": 0.0,
+              "n_equal": 0,
+              "max_lag": null,
+              "median_lag": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "check_id": "TMP-002",
+      "name": "Feature available after the outcome",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "refund_amount": {
+          "availability_column": "refund_amount_available_at",
+          "boundary_rule": "Strict comparison: a value is flagged only if its timestamp is strictly later. Equal timestamps are counted in n_equal but not flagged, because the data cannot show whether a value stamped at exactly that instant was usable.",
+          "partitions": {
+            "train": {
+              "n_rows": 800,
+              "n_compared": 800,
+              "n_not_compared_missing": 0,
+              "n_violations": 800,
+              "violation_rate": 1.0,
+              "n_equal": 0,
+              "max_lag": "15 days 00:00:00",
+              "median_lag": "15 days 00:00:00"
+            },
+            "test": {
+              "n_rows": 200,
+              "n_compared": 200,
+              "n_not_compared_missing": 0,
+              "n_violations": 200,
+              "violation_rate": 1.0,
+              "n_equal": 0,
+              "max_lag": "15 days 00:00:00",
+              "median_lag": "15 days 00:00:00"
+            }
+          }
+        },
+        "tenure_months": {
+          "availability_column": "tenure_available_at",
+          "boundary_rule": "Strict comparison: a value is flagged only if its timestamp is strictly later. Equal timestamps are counted in n_equal but not flagged, because the data cannot show whether a value stamped at exactly that instant was usable.",
+          "partitions": {
+            "train": {
+              "n_rows": 800,
+              "n_compared": 800,
+              "n_not_compared_missing": 0,
+              "n_violations": 0,
+              "violation_rate": 0.0,
+              "n_equal": 0,
+              "max_lag": null,
+              "median_lag": null
+            },
+            "test": {
+              "n_rows": 200,
+              "n_compared": 200,
+              "n_not_compared_missing": 0,
+              "n_violations": 0,
+              "violation_rate": 0.0,
+              "n_equal": 0,
+              "max_lag": null,
+              "median_lag": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "check_id": "TMP-003",
+      "name": "Outcome timing contradicts the prediction boundary",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "min_lead_time": null,
+        "partitions": {
+          "train": {
+            "n_compared": 800,
+            "n_not_compared_missing": 0,
+            "n_outcome_before_prediction": 0,
+            "n_outcome_equal_to_prediction": 0,
+            "n_lead_time_below_minimum": null,
+            "min_gap": "30 days 00:00:00"
+          },
+          "test": {
+            "n_compared": 200,
+            "n_not_compared_missing": 0,
+            "n_outcome_before_prediction": 0,
+            "n_outcome_equal_to_prediction": 0,
+            "n_lead_time_below_minimum": null,
+            "min_gap": "30 days 00:00:00"
+          }
+        },
+        "boundary_rule": "An outcome strictly earlier than the prediction is a violation. An outcome at the same instant is counted but only flagged when min_lead_time is set."
+      }
+    },
+    {
+      "check_id": "TMP-004",
+      "name": "Train and test time ranges overlap",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "train_min": "2024-01-01T00:00:00+00:00",
+        "train_max": "2024-06-28T00:00:00+00:00",
+        "test_min": "2024-07-01T00:00:00+00:00",
+        "test_max": "2024-12-27T00:00:00+00:00",
+        "n_train_rows_after_test_start": 0,
+        "n_test_rows_before_train_end": 0,
+        "scenario": "forecasting",
+        "n_train_rows_at_boundary": 0,
+        "n_test_rows_at_boundary": 0
+      }
+    },
+    {
+      "check_id": "TMP-005",
+      "name": "Temporal wording in a column name",
+      "status": "run",
+      "reason": null,
+      "details": {
+        "n_columns_flagged": 0,
+        "n_with_availability_metadata": 2
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "TMP-002:refund_amount",
+      "rule_id": "TMP-002",
+      "category": "temporal_leakage",
+      "severity": "critical",
+      "confidence": "high",
+      "title": "'refund_amount' is recorded after the outcome on 1000 row(s)",
+      "description": "For 1000 rows 'refund_amount_available_at' is later than the outcome timestamp 'outcome_time': the value was created after the label was known and may encode it.",
+      "evidence": {
+        "comparison_rule": "refund_amount_available_at > outcome_time",
+        "assumptions": "All timestamps share one clock; naive timestamps were interpreted as UTC. Rows with a missing timestamp on either side are not compared.",
+        "partitions": {
+          "train": {
+            "n_rows": 800,
+            "n_compared": 800,
+            "n_not_compared_missing": 0,
+            "n_violations": 800,
+            "violation_rate": 1.0,
+            "n_equal": 0,
+            "max_lag": "15 days 00:00:00",
+            "median_lag": "15 days 00:00:00"
+          },
+          "test": {
+            "n_rows": 200,
+            "n_compared": 200,
+            "n_not_compared_missing": 0,
+            "n_violations": 200,
+            "violation_rate": 1.0,
+            "n_equal": 0,
+            "max_lag": "15 days 00:00:00",
+            "median_lag": "15 days 00:00:00"
+          }
+        }
+      },
+      "affected_columns": [
+        "refund_amount",
+        "refund_amount_available_at",
+        "outcome_time"
+      ],
+      "recommended_action": "Remove 'refund_amount' or rebuild it from pre-outcome data only.",
+      "limitations": [
+        "Relies entirely on the supplied availability and outcome timestamps."
+      ]
+    },
+    {
+      "finding_id": "TMP-001:refund_amount",
+      "rule_id": "TMP-001",
+      "category": "temporal_leakage",
+      "severity": "high",
+      "confidence": "high",
+      "title": "'refund_amount' becomes available after prediction time on 1000 row(s)",
+      "description": "For 1000 rows the availability timestamp 'refund_amount_available_at' is later than the prediction timestamp 'prediction_time'. At prediction time the model could not have known this value.",
+      "evidence": {
+        "comparison_rule": "refund_amount_available_at > prediction_time",
+        "assumptions": "All timestamps share one clock; naive timestamps were interpreted as UTC. Rows with a missing timestamp on either side are not compared.",
+        "partitions": {
+          "train": {
+            "n_rows": 800,
+            "n_compared": 800,
+            "n_not_compared_missing": 0,
+            "n_violations": 800,
+            "violation_rate": 1.0,
+            "n_equal": 0,
+            "max_lag": "45 days 00:00:00",
+            "median_lag": "45 days 00:00:00"
+          },
+          "test": {
+            "n_rows": 200,
+            "n_compared": 200,
+            "n_not_compared_missing": 0,
+            "n_violations": 200,
+            "violation_rate": 1.0,
+            "n_equal": 0,
+            "max_lag": "45 days 00:00:00",
+            "median_lag": "45 days 00:00:00"
+          }
+        }
+      },
+      "affected_columns": [
+        "refund_amount",
+        "refund_amount_available_at",
+        "prediction_time"
+      ],
+      "recommended_action": "Use only values of 'refund_amount' recorded at or before prediction time (an as-of join), or remove the feature.",
+      "limitations": [
+        "The finding is only as reliable as the availability metadata supplied.",
+        "If the availability column records something other than when the value was known (for example a last-modified time), the comparison may be wrong."
+      ]
+    },
+    {
+      "finding_id": "TGT-005:refund_amount",
+      "rule_id": "TGT-005",
+      "category": "target_leakage",
+      "severity": "medium",
+      "confidence": "low",
+      "title": "Unusually strong association between 'refund_amount' and the target (review; not proof)",
+      "description": "single-feature ROC AUC, max(auc, 1 - auc) = 1.000 over 800 rows of the train partition (review threshold 0.95). Strong association alone does not establish leakage: good legitimate predictors look the same.",
+      "evidence": {
+        "partition": "train",
+        "statistic": "single-feature ROC AUC, max(auc, 1 - auc)",
+        "value": 1.0,
+        "threshold": 0.95,
+        "n_pairs": 800,
+        "flagged": true,
+        "auc": 1.0
+      },
+      "affected_columns": [
+        "refund_amount"
+      ],
+      "recommended_action": "Confirm that 'refund_amount' is recorded before prediction time and is not derived from the outcome. Keep it if its provenance is sound.",
+      "limitations": [
+        "Correlation is not leakage. Many strong features are legitimate.",
+        "Univariate statistics miss leakage that only appears in combinations of features."
+      ]
+    }
+  ],
+  "split_recommendation": null,
+  "warnings": [
+    "No entity_id configured: entity overlap across partitions was not checked."
+  ],
+  "limitations": [
+    "No findings does not mean no leakage: only the listed checks were run, and each detects specific, explainable patterns.",
+    "Only exact duplicates are detected; near-duplicates (fuzzy matches, re-scaled or re-formatted copies) are not.",
+    "Findings can describe the same underlying problem from different angles (for example DUP-002, DUP-004 and ID-003); they are not independent confirmations.",
+    "Statistical associations are review signals, not proof of leakage.",
+    "Leakage spread across combinations of features is not detected (no model is trained)."
+  ]
+}

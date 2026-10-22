@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# Generated example data and reports (regenerate with examples/generate_synthetic_data.py)
+examples/data/
+examples/output/
+*.report.json
+
+# Streamlit local secrets/config (never commit secrets)
+.streamlit/secrets.toml
