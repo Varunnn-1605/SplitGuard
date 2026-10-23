@@ -1,0 +1,23 @@
+# Store text with LF in the repository and check it out with LF on every platform,
+# so generated files (e.g. examples/sample_report.json) compare byte-for-byte.
+* text=auto eol=lf
+
+*.py    text eol=lf
+*.md    text eol=lf
+*.toml  text eol=lf
+*.json  text eol=lf
+*.csv   text eol=lf
+*.txt   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# Windows scripts need CRLF.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.whl   binary
+*.zip   binary
