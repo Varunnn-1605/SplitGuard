@@ -100,6 +100,58 @@ splitguard-ui
 
 Open the local address printed by the launcher, normally `http://localhost:8501`. The UI wraps the same audit engine; it does not implement a separate set of detection rules.
 
+### Optional plain-language explanations (local LLM)
+
+SplitGuard can ask a local language model, served by [Ollama](https://ollama.com), to explain a finished report in plain language: why each finding matters, what its evidence shows, what to inspect next, and what was not assessed. The deterministic findings stay authoritative. The model cannot add, remove, re-rate or change findings, and its text is never written into the audit report.
+
+**What the model sees.** Only an allowlisted summary of the report:
+- per finding: ID, rule, category, severity, confidence, title, description, aggregate evidence, affected column names, recommended action and limitations;
+- skipped or failed checks with their reasons;
+- coverage warnings.
+
+No CSV rows, DataFrames, file names, hashes or paths are sent. Run `splitguard explain report.json --show-input` to see exactly what would be sent. Column names come from your data and could contain misleading text; the explainer passes them as escaped data and tells the model not to follow them, but no prompt can rule this out completely.
+
+**Setup (all manual; SplitGuard never downloads models or starts Ollama):**
+
+1. Install Ollama from https://ollama.com/download and start it.
+2. Download the default model yourself:
+   ```bash
+   ollama pull qwen2.5:3b-instruct
+   ```
+3. Check that SplitGuard can reach it:
+   ```bash
+   splitguard explain --check
+   ```
+
+No extra Python packages are needed; the explainer uses the standard library to call Ollama's local API.
+
+**Use it:**
+
+```bash
+splitguard audit --train train.csv --test test.csv --target churn --output report.json
+splitguard explain report.json
+```
+
+In the UI, run an audit, then click **Explain these results** under the findings.
+
+**Configure:**
+- Model: set `--model` or `SPLITGUARD_LLM_MODEL`, for example `qwen2.5:7b-instruct` (pull it first).
+- Timeout: set `--timeout` or `SPLITGUARD_LLM_TIMEOUT` (seconds; default 300).
+- Endpoint: set `--host` or `SPLITGUARD_OLLAMA_HOST`. Only `localhost`, `127.0.0.1` or `::1` are accepted. Proxies, redirects and Ollama's own `OLLAMA_HOST` and `OLLAMA_API_KEY` variables are ignored.
+
+**Resources (approximate, from Ollama's model listings; not measured here):**
+- `qwen2.5:3b-instruct` is about a 2 GB download and needs roughly 3 GB of free RAM.
+- `qwen2.5:7b-instruct` is about a 4.7 GB download and needs roughly 6 GB, which is tight on an 8 GB machine.
+- Memory use and speed depend on context length (the explainer uses 6,144 tokens), quantization and available CPU/GPU. On a CPU, one explanation can take minutes.
+
+The 3B model is the default because it fits modest hardware. It has not been benchmarked for explanation quality, and it is not claimed to be as accurate as 7B.
+
+**Limits:**
+- Explanations can be wrong or incomplete. Always check them against the findings and evidence they sit next to.
+- Answers that are malformed, oversized or refer to unknown findings are rejected or trimmed.
+- Simple checks flag text that overstates certainty (for example "the data is safe") or names a severity that differs from the report. These checks reduce the risk but do not remove it.
+- Large reports are capped: the most severe 12 findings are sent, and the rest are listed as not explained.
+
 ## How findings work
 
 Every finding separates two concepts:
@@ -117,7 +169,7 @@ The project includes unit tests and an independent, deterministic synthetic vali
 
 Latest recorded checkpoint:
 
-- **251 tests passed** with the `dev` and `ui` extras installed (without Streamlit, the UI test module is skipped)
+- **320 tests passed** with the `dev` and `ui` extras installed (without Streamlit, the UI test modules are skipped). The explainer tests use a mock provider and a fake local server; they need no Ollama or model.
 - **13/13** injected leakage scenarios detected
 - **0/12** false alarms across clean controls
 - **21/21** boundary cases passed
@@ -136,7 +188,7 @@ ruff format --check .
 
 ## Privacy and limitations
 
-- Audits run locally. The core engine does not require an LLM, network access, or a paid API.
+- Audits run locally. The core engine does not require an LLM, network access, or a paid API. The optional explainer only talks to a local Ollama endpoint, and only when you ask for an explanation.
 - Findings report counts, rates and statistics; they do not include raw row values by default.
 - The optional UI keeps uploaded files in application memory and does not send them to an external service. The `splitguard-ui` launcher binds to `localhost` and turns off Streamlit's usage statistics.
 - The UI is intended for a single user on their own machine. It has no authentication and is not hardened for public or shared deployment.
@@ -148,7 +200,7 @@ ruff format --check .
 
 **Version 0.2.0.** The deterministic audit engine, CLI, Python API, JSON reporting, optional local UI, and synthetic validation suite are implemented.
 
-An optional LLM-generated explanation layer is planned. It is not part of this release.
+An optional local LLM explanation layer (Ollama, default `qwen2.5:3b-instruct`) is available but experimental. Its explanation quality has not yet been evaluated.
 
 ## License
 

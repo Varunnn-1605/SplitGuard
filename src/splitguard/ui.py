@@ -11,12 +11,24 @@ engine's own result objects.
 from __future__ import annotations
 
 import hashlib
+import time
 from typing import Any
 
 import streamlit as st
 
 from splitguard import __version__
+from splitguard import ui_theme as theme
 from splitguard.config import Limits
+from splitguard.explain import (
+    DISCLAIMER,
+    ExplainerError,
+    ExplainerSettings,
+    ExplanationInputError,
+    ExplanationProvider,
+    OllamaProvider,
+    build_explanation_input,
+    explain_report,
+)
 from splitguard.schemas import AuditResult, Finding
 from splitguard.ui_adapter import (
     CATEGORIES,
@@ -73,6 +85,11 @@ ROLE_LABELS = {"train": "Training CSV", "test": "Testing CSV", "data": "CSV file
 def _msg(text: str) -> str:
     """Escape engine/user text for st.markdown-based elements."""
     return md_escape(text)
+
+
+def md_strip(text: str) -> str:
+    """Plain text from the small amount of Markdown in help strings (for tooltips)."""
+    return text.replace("*", "").replace("`", "")
 
 
 def _code(text: str) -> str:
@@ -394,6 +411,8 @@ def _step_run(state: FormState, files: dict[str, LoadedFile]) -> None:
         )
     if st.button("Run audit", type="primary", disabled=bool(missing), key="run_audit"):
         st.session_state.pop("split_download", None)
+        for key in ("llm_explanation", "llm_error"):
+            st.session_state.pop(key, None)
         with st.spinner("Running SplitGuard checks..."):
             try:
                 result = run_audit(state, files)
@@ -412,26 +431,25 @@ def _step_run(state: FormState, files: dict[str, LoadedFile]) -> None:
 
 
 def _badge_row(f: Finding) -> None:
-    cols = st.columns([1, 1.6, 3])
-    with cols[0]:
+    with st.container(horizontal=True, gap="small", vertical_alignment="center"):
         st.badge(
             f.severity.value.upper(),
             color=SEVERITY_COLORS[f.severity.value],
             help="Severity: potential impact if the issue is real.",
         )
-    with cols[1]:
         st.badge(
-            f"{f.confidence.value} confidence - {evidence_label(f)}",
+            f"{theme.confidence_html(f.confidence.value)} {f.confidence.value} confidence - "
+            f"{evidence_label(f)}",
             color=CONFIDENCE_COLORS[f.confidence.value],
             help="Confidence: how strongly the data supports this finding.",
         )
-    with cols[2]:
-        st.caption(f"{category_label(f.category.value)} | {f.finding_id}")
+        st.caption(f"{category_label(f.category.value)} | {_code(f.finding_id)}")
 
 
-def _render_finding(f: Finding) -> None:
+def _render_finding(f: Finding, index: int = 0) -> None:
     view = finding_view(f)
-    with st.container(border=True):
+    st.html(theme.anchor_html(f.finding_id))
+    with st.container(key=f"sev-{f.severity.value}-{index}"):
         _badge_row(f)
         st.markdown(f"**{_msg(view['title'])}**")
         st.markdown(_msg(view["description"]))
@@ -513,8 +531,8 @@ def _findings(result: AuditResult) -> None:
     st.caption(f"Showing {len(shown)} of {len(result.findings)} finding(s), most severe first.")
     if not shown:
         st.info("No findings match these filters.")
-    for f in shown:
-        _render_finding(f)
+    for index, f in enumerate(shown):
+        _render_finding(f, index)
 
 
 def _split_section(
@@ -525,6 +543,26 @@ def _split_section(
         return
     st.subheader("Split recommendation")
     st.caption("This dataset was not split. Train/test contamination was not audited.")
+    recommended = rec.strategy if rec.status == "recommended" else None
+    st.html(
+        theme.chips_html(
+            [(name, "rec" if name == recommended else "") for name in STRATEGY_HELP],
+            tooltips={name: md_strip(text) for name, text in STRATEGY_HELP.items()},
+        )
+    )
+    test_size = rec.parameters.get("test_size")
+    if recommended and isinstance(test_size, (int, float)) and 0 < test_size < 1:
+        st.html(
+            theme.split_bar_html(
+                [
+                    (f"train {1 - test_size:.0%}", 1 - test_size, "train"),
+                    (f"test {test_size:.0%}", test_size, "test"),
+                ],
+                caption=f"Proposed {recommended} split. Change the test share under "
+                "2. Configure > More options. A split separates rows by this rule only; it does "
+                "not remove duplicate rows or leaked features.",
+            )
+        )
     if rec.status == "needs_user_input":
         st.warning(
             "**SplitGuard needs more information before recommending a split.**\n\n"
@@ -611,6 +649,164 @@ def _split_creation(rec: Any, state: FormState, files: dict[str, LoadedFile], fr
             )
 
 
+EXPLAINER_NOTE = (
+    "Optional. A local language model, served by Ollama on this computer, writes a "
+    "plain-language explanation of the findings above. It receives only a summarised copy "
+    "of the report (shown below) - never your CSV rows - and it cannot change, add or remove "
+    "findings. Nothing happens until you click a button."
+)
+
+
+def make_explainer_provider(settings: ExplainerSettings) -> ExplanationProvider:
+    """Provider factory (tests replace it with a mock)."""
+    return OllamaProvider(settings)
+
+
+def _explanation(result: AuditResult, fresh: bool) -> None:
+    try:
+        defaults = ExplainerSettings.from_env()
+    except ExplanationInputError as exc:
+        st.error(_msg(f"Explainer settings from the environment are invalid: {exc}"))
+        return
+    default_model = defaults.model
+    shown_model = str(st.session_state.get("llm_model", default_model)).strip() or default_model
+    st.html(theme.terminal_header_html(shown_model, defaults.host))
+    st.markdown("#### Plain-language explanation")
+    st.caption(EXPLAINER_NOTE)
+    model = st.text_input(
+        "Ollama model",
+        value=default_model,
+        key="llm_model",
+        help="Any model already installed in your local Ollama. SplitGuard never downloads models.",
+    )
+    try:
+        settings = ExplainerSettings.from_env(model=model.strip() or None)
+        payload = build_explanation_input(result)
+    except ExplanationInputError as exc:
+        st.error(_msg(str(exc)), icon=":material/error:")
+        return
+    st.caption(
+        f"Model {_code(settings.model)} via Ollama at {_code(settings.host)} (local only), "
+        f"timeout {settings.timeout_s:g} s."
+    )
+    with st.expander("Exactly what would be sent to the model"):
+        st.caption(
+            "An allowlisted summary of this report: findings, aggregate evidence, column names "
+            "and coverage notes. No CSV rows, file names, hashes or paths."
+        )
+        st.json(payload, expanded=1)
+    if not fresh:
+        st.caption("Run the audit again before requesting an explanation.")
+    provider = make_explainer_provider(settings)
+    explain_clicked = st.button(
+        "Explain these results",
+        key="llm_explain",
+        disabled=not fresh,
+        type="primary",
+        width="stretch",
+        icon=":material/auto_awesome:",
+    )
+    if st.button("Check model availability", key="llm_check", width="stretch"):
+        st.session_state["llm_status"] = provider.check()
+    status = st.session_state.get("llm_status")
+    if status is not None and status.model == settings.model:
+        if status.ok:
+            st.success(_msg(status.message), icon=":material/check_circle:")
+        else:
+            st.warning(_msg(status.message), icon=":material/cloud_off:")
+    stamp = (st.session_state.get("result_fp"), settings.model)
+    if explain_clicked:
+        with st.spinner(f"Asking {settings.model}. Small local models can take a few minutes..."):
+            try:
+                st.session_state["llm_explanation"] = (stamp, explain_report(result, provider))
+                st.session_state["llm_reveal"] = True
+                st.session_state.pop("llm_error", None)
+            except ExplainerError as exc:
+                st.session_state["llm_error"] = (stamp, str(exc))
+                st.session_state.pop("llm_explanation", None)
+    error = st.session_state.get("llm_error")
+    if error is not None and error[0] == stamp:
+        st.error(
+            "**No explanation was produced.** " + _msg(error[1]) + "\n\nThe audit results above "
+            "are unaffected.",
+            icon=":material/error:",
+        )
+    stored = st.session_state.get("llm_explanation")
+    if stored is not None and stored[0] == stamp:
+        _render_explanation(result, stored[1])
+
+
+def _typed(words: list[str]) -> Any:
+    for i, word in enumerate(words):
+        yield word if i == 0 else " " + word
+        time.sleep(0.012)
+
+
+def _render_explanation(result: AuditResult, exp: Any) -> None:
+    st.info(
+        f"**LLM-generated narrative ({_msg(exp.model)}) - not an audit finding.** "
+        + _msg(DISCLAIMER),
+        icon=":material/smart_toy:",
+    )
+    for flag in exp.review_flags:
+        st.warning(_msg(flag), icon=":material/flag:")
+    if st.session_state.pop("llm_reveal", False):
+        # Cosmetic reveal of the already-validated text, once, right after it arrives.
+        words = _msg(exp.overview).split(" ")
+        st.write_stream(_typed(words))
+    else:
+        st.markdown(_msg(exp.overview))
+    by_id = {f.finding_id: f for f in result.findings}
+    for fe in exp.findings:
+        finding = by_id.get(fe.finding_id)
+        with st.container(border=True):
+            st.html(theme.ref_chip_html(fe.finding_id))
+            if finding is not None:
+                _badge_row(finding)
+            st.markdown(f"**{_msg(fe.title)}**")
+            st.caption(f"Model's explanation. Per the report this is a {fe.evidence_kind}.")
+            st.markdown(
+                "\n".join(
+                    f"- **{label}:** {_msg(text)}"
+                    for label, text in (
+                        ("Why it matters", fe.why_it_matters),
+                        ("Evidence", fe.evidence),
+                        ("What to check", fe.what_to_check),
+                        ("Limitations", fe.limitations),
+                    )
+                )
+            )
+            if finding is not None:
+                view = finding_view(finding)
+                with st.expander("Original finding from the audit (authoritative)"):
+                    st.markdown(_msg(view["description"]))
+                    st.markdown(f"**Recommended action:** {_msg(view['recommended_action'])}")
+                    st.markdown(
+                        "**Why this is not proof:**\n"
+                        + "\n".join(f"- {_msg(x)}" for x in view["limitations"])
+                    )
+                    st.json(view["evidence"], expanded=1)
+    st.markdown("**Coverage (model's summary)**")
+    st.markdown(_msg(exp.coverage))
+    st.caption(
+        "The complete list of skipped checks and coverage warnings is in "
+        "'What was not fully assessed' above."
+    )
+    st.markdown(f"**Caveats:** {_msg(exp.caveats)}")
+    if exp.unexplained_finding_ids:
+        st.caption(
+            "Not explained by the model: "
+            + ", ".join(_code(i) for i in exp.unexplained_finding_ids)
+            + ". See the findings above."
+        )
+    if exp.findings_not_sent:
+        st.caption(
+            "Not sent to the model (size limit): "
+            + ", ".join(_code(i) for i in exp.findings_not_sent)
+            + ". See the findings above."
+        )
+
+
 def _downloads(result: AuditResult) -> None:
     st.subheader("Download")
     stable = st.checkbox(
@@ -641,6 +837,23 @@ def _downloads(result: AuditResult) -> None:
     )
 
 
+def _partition_bar(result: AuditResult) -> None:
+    """Rows per partition, straight from the audit result (train/test modes only)."""
+    rows = {name: int(p.get("n_rows", 0)) for name, p in result.partitions.items()}
+    if not {"train", "test"} <= set(rows) or not sum(rows.values()):
+        return
+    total = rows["train"] + rows["test"]
+    st.html(
+        theme.split_bar_html(
+            [
+                (f"train {rows['train']:,}", rows["train"] / total, "train"),
+                (f"test {rows['test']:,}", rows["test"] / total, "test"),
+            ],
+            caption=f"Audited partitions: {rows['test'] / total:.0%} of rows are in test.",
+        )
+    )
+
+
 def _step_results(result: AuditResult, state: FormState, files: dict[str, LoadedFile]) -> None:
     st.header("4. Results", divider="gray")
     fresh = st.session_state.get("result_fp") == _fingerprint(state, files)
@@ -653,18 +866,32 @@ def _step_results(result: AuditResult, state: FormState, files: dict[str, Loaded
     getattr(st, level)(_msg(message))
     summary = result.summary()
     sev = summary["by_severity"]
-    m = st.columns(4)
-    m[0].metric("Findings", summary["total_findings"])
-    m[1].metric("Critical / high", f"{sev['critical']} / {sev['high']}")
-    m[2].metric("Checks run", summary["checks_run"])
-    m[3].metric(
-        "Not run",
-        summary["checks_skipped"] + summary["checks_failed"],
-        help="Skipped (missing metadata or not applicable) plus failed checks.",
-    )
+    not_run = summary["checks_skipped"] + summary["checks_failed"]
+    ring, tiles = st.columns([1.6, 1], gap="medium")
+    with ring:
+        st.html(theme.overview_html(sev, summary["checks_run"], not_run))
+    with tiles:
+        m = st.columns(2)
+        m[0].metric("Findings", summary["total_findings"])
+        m[1].metric("Critical / high", f"{sev['critical']} / {sev['high']}")
+        m = st.columns(2)
+        m[0].metric("Checks run", summary["checks_run"])
+        m[1].metric(
+            "Not run",
+            not_run,
+            help="Skipped (missing metadata or not applicable) plus failed checks.",
+        )
+        _partition_bar(result)
     _coverage(result)
     _split_section(result, state, files, fresh)
-    _findings(result)
+    grid = theme.columns_grid_html(result.findings)
+    if grid:
+        st.html(grid)
+    main, side = st.columns([1.55, 1], gap="large")
+    with main:
+        _findings(result)
+    with side, st.container(key="insight"):
+        _explanation(result, fresh)
     _downloads(result)
     with st.expander("Engine limitations"):
         st.markdown("\n".join(f"- {_msg(x)}" for x in result.limitations))
@@ -675,9 +902,9 @@ def _step_results(result: AuditResult, state: FormState, files: dict[str, Loaded
 
 def run_app() -> None:
     st.set_page_config(page_title="SplitGuard", page_icon=":material/shield:", layout="wide")
+    st.html(theme.CSS)
     _sidebar()
-    st.title("SplitGuard")
-    st.caption("Evidence-driven checks for ML data leakage and train/test contamination.")
+    st.html(theme.hero_html(__version__))
     intro = st.container()  # filled only while no data is loaded, so it sits above step 1
     mode, files, sample, had_error = _step_data()
     if not files and not had_error:
@@ -689,3 +916,9 @@ def run_app() -> None:
     result = st.session_state.get("result")
     if isinstance(result, AuditResult):
         _step_results(result, state, files)
+
+
+# `streamlit run src/splitguard/ui.py` executes this file as __main__; without this
+# the page would stay blank. Importing the module (ui_app.py, tests) does not run it.
+if __name__ == "__main__":
+    run_app()

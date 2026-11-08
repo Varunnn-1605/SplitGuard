@@ -15,3 +15,6 @@ examples/output/
 
 # Streamlit local secrets/config (never commit secrets)
 .streamlit/secrets.toml
+
+# Local Claude Code settings (machine-specific)
+.claude/

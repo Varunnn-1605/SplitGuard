@@ -4,7 +4,8 @@ Exit codes:
     0  audit completed (findings may exist)
     1  a finding met the --fail-on severity
     2  invalid input, configuration or usage
-    3  a check failed internally, or an unexpected error occurred
+    3  a check failed internally, or an unexpected error occurred;
+       for ``explain``: the local model was unavailable or its answer failed validation
 """
 
 from __future__ import annotations
@@ -132,7 +133,103 @@ def build_parser() -> argparse.ArgumentParser:
     split.add_argument("--test-size", type=float, default=0.2)
     split.add_argument("--seed", type=int, default=42)
     split.add_argument("--overwrite", action="store_true", help="replace existing output files")
+
+    explain = sub.add_parser(
+        "explain",
+        help="explain a saved JSON report with a local Ollama model (optional)",
+        description=(
+            "Explain an existing SplitGuard JSON report in plain language with a local model "
+            "served by Ollama. The report is not changed and no audit is re-run. Only an "
+            "allowlisted summary of the report is sent - never CSV rows. The explanation is "
+            "not an audit finding and may be wrong."
+        ),
+    )
+    explain.add_argument("report", type=Path, nargs="?", help="JSON report from `audit`/`inspect`")
+    explain.add_argument(
+        "--model", help="Ollama model (default: $SPLITGUARD_LLM_MODEL or built-in)"
+    )
+    explain.add_argument("--host", help="local Ollama endpoint (default http://127.0.0.1:11434)")
+    explain.add_argument("--timeout", type=float, help="generation timeout in seconds")
+    explain.add_argument(
+        "--check", action="store_true", help="only check that Ollama and the model are available"
+    )
+    explain.add_argument(
+        "--show-input",
+        action="store_true",
+        help="print exactly what would be sent to the model, then exit (no model call)",
+    )
+    explain.add_argument(
+        "--output", "-o", type=Path, help="also write the explanation to this JSON file"
+    )
     return parser
+
+
+MAX_REPORT_BYTES = 20 * 1024 * 1024
+
+
+def _run_explain(args: argparse.Namespace) -> int:
+    # Imported here so the core commands never load the optional explainer.
+    from splitguard.explain import (
+        ExplainerError,
+        ExplainerSettings,
+        ExplanationInputError,
+        OllamaProvider,
+        build_explanation_input,
+        explain_report,
+        render_text,
+    )
+    from splitguard.explain.prompt import encode_payload
+
+    try:
+        settings = ExplainerSettings.from_env(
+            model=args.model, host=args.host, timeout_s=args.timeout
+        )
+    except ExplanationInputError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return EXIT_INVALID
+    provider = OllamaProvider(settings)
+    if args.check:
+        status = provider.check()
+        print(status.message)
+        if status.server_reachable and not status.model_available and status.installed_models:
+            print("Installed models: " + ", ".join(status.installed_models))
+        return EXIT_OK if status.ok else EXIT_FAILED
+    if args.report is None:
+        print("Error: give a JSON report path, or use --check.", file=sys.stderr)
+        return EXIT_INVALID
+    if args.report.stat().st_size > MAX_REPORT_BYTES:
+        print("Error: the report file is larger than 20 MB.", file=sys.stderr)
+        return EXIT_INVALID
+    try:
+        report = json.loads(args.report.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        print(f"Error: {args.report.name} is not a JSON report.", file=sys.stderr)
+        return EXIT_INVALID
+    if not isinstance(report, dict):
+        print(f"Error: {args.report.name} is not a SplitGuard report.", file=sys.stderr)
+        return EXIT_INVALID
+    try:
+        if args.show_input:
+            print(encode_payload(build_explanation_input(report)))
+            return EXIT_OK
+        print(
+            f"Asking local model '{settings.model}' at {settings.host} (this can take minutes)..."
+        )
+        explanation = explain_report(report, provider)
+    except ExplanationInputError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return EXIT_INVALID
+    except ExplainerError as exc:
+        print(f"Explanation unavailable: {exc}", file=sys.stderr)
+        return EXIT_FAILED
+    print(render_text(explanation))
+    if args.output:
+        args.output.write_text(
+            json.dumps(explanation.to_dict(), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"Explanation written to: {args.output} (separate from the audit report)")
+    return EXIT_OK
 
 
 def _config_from_args(args: argparse.Namespace) -> AuditConfig:
@@ -252,6 +349,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        if args.command == "explain":
+            return _run_explain(args)
         config = _config_from_args(args)
         if args.command == "audit":
             return _finish(_run_audit(args, config), args)

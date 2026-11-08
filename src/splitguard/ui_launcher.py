@@ -17,9 +17,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from splitguard.config import Limits
+from splitguard.ui_theme import THEME_OPTIONS
 
 APP_PATH = Path(__file__).with_name("ui_app.py")
-PRIMARY_COLOR = "#2f5d8a"
+PRIMARY_COLOR = THEME_OPTIONS["primaryColor"]
 
 
 def streamlit_args(address: str, port: int, headless: bool) -> list[str]:
@@ -43,9 +44,9 @@ def streamlit_args(address: str, port: int, headless: bool) -> list[str]:
         # Hide developer options such as the "Deploy" (publish to cloud) button.
         "--client.toolbarMode",
         "viewer",
-        # Neutral accent: Streamlit's default red reads as "danger" on filters and buttons.
-        "--theme.primaryColor",
-        PRIMARY_COLOR,
+        # Dark SplitGuard theme (see ui_theme.py). The accent is not red, which would
+        # read as "danger" on filters and buttons.
+        *[arg for name, value in THEME_OPTIONS.items() for arg in (f"--theme.{name}", value)],
     ]
 
 

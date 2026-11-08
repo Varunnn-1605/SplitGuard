@@ -1,0 +1,23 @@
+# Safe defaults when the UI is started with `streamlit run` from the repository root.
+# The `splitguard-ui` launcher passes the same settings on the command line.
+
+[browser]
+gatherUsageStats = false
+
+[server]
+# Listen on this computer only (Streamlit's own default listens on every interface).
+address = "localhost"
+maxUploadSize = 200
+
+[client]
+# Hide developer options such as the "Deploy" (publish to cloud) button.
+toolbarMode = "viewer"
+
+[theme]
+# Keep in sync with THEME_OPTIONS in src/splitguard/ui_theme.py (a test checks this).
+base = "dark"
+primaryColor = "#22D3EE"
+backgroundColor = "#0B0F19"
+secondaryBackgroundColor = "#111827"
+textColor = "#E6EDF7"
+borderColor = "#222C40"
